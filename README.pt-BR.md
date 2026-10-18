@@ -74,6 +74,7 @@ Ou copie `skills/` para o local de onde o seu agente carrega skills.
 | [mysql-transactions-and-locking](skills/mysql-transactions-and-locking/SKILL.md) | Abrir transações InnoDB, REPEATABLE READ ou READ COMMITTED e gap locks, filas com SKIP LOCKED, NOWAIT, lock wait timeout (1205) e deadlock (1213) |
 | [mysql-online-ddl](skills/mysql-online-ddl/SKILL.md) | Alterar o schema com tráfego ativo: ALGORITHM e LOCK explícitos, limite de versões de linha do INSTANT, metadata locks com lock_wait_timeout, índices invisíveis antes do drop, gh-ost |
 | [mysql-connections](skills/mysql-connections/SKILL.md) | Dimensionar os pools de conexão da frota: orçamento, pico do deploy, MAX_USER_CONNECTIONS por conta, wait_timeout contra o tempo de vida do pool, pinning do RDS Proxy |
+| [mysql-throughput-per-connection](skills/mysql-throughput-per-connection/SKILL.md) | Tirar mais vazão de cada conexão, conexões demais, lentidão sob carga, espera por locks ou deadlocks, escalar sem instância maior: um comando por página (LATERAL + JSON_ARRAYAGG), um commit para muitas linhas sem abrir mão da durabilidade, filas com SKIP LOCKED em READ COMMITTED, contadores quentes particionados, pool pequeno e medido |
 
 ---
 

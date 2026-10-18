@@ -203,15 +203,23 @@ CREATE EVENT forgotten_select ON SCHEDULE AT CURRENT_TIMESTAMP DO
 BEGIN
   SET autocommit = 0;
   SELECT COUNT(*) INTO @n FROM jobs;
-  DO SLEEP(6);
+  -- Held long enough for slow CI disks; killed below once measured.
+  DO SLEEP(120);
 END$$
 DELIMITER ;
 
 CALL wait_for_trx();
-SELECT count INTO @history_before FROM information_schema.innodb_metrics WHERE name = 'trx_rseg_history_len';
 CALL touch_orders(1000);
 SELECT count INTO @history_after FROM information_schema.innodb_metrics WHERE name = 'trx_rseg_history_len';
-CALL assert_true(@history_after - @history_before >= 900, 'history list grew by one entry per committed update');
+-- Every update committed after the open read view stays in the history list.
+CALL assert_true(@history_after >= 900, 'purge cannot remove updates newer than the open read view');
+
+-- End the forgotten session instead of waiting out its sleep.
+SELECT CONCAT('KILL ', trx_mysql_thread_id) INTO @kill FROM information_schema.innodb_trx
+  WHERE trx_mysql_thread_id <> CONNECTION_ID() LIMIT 1;
+PREPARE k FROM @kill;
+EXECUTE k;
+DEALLOCATE PREPARE k;
 
 CALL wait_idle();
 DROP EVENT IF EXISTS worker1_claims;

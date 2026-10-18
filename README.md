@@ -54,6 +54,7 @@ Or copy `skills/` into wherever your agent loads skills from.
 | [pg-observability](skills/pg-observability/SKILL.md) | Finding the queries that cost the most: pg_stat_statements by total time, track_io_timing, slow-query log, sampled auto_explain, safe EXPLAIN ANALYZE, wait events, pg_stat_io, RDS Database Insights |
 | [pg-config-by-size](skills/pg-config-by-size/SKILL.md) | Sizing shared_buffers, effective_cache_size, work_mem and maintenance_work_mem from the instance, raising work_mem for one query, RDS and Aurora parameter groups, PG 18 async I/O |
 | [pg-vacuum-and-bloat](skills/pg-vacuum-and-bloat/SKILL.md) | Keeping tables from bloating: autovacuum tuned per hot table, no long or idle-in-transaction sessions, HOT updates with fillfactor, batched deletes, no VACUUM FULL on live tables, XID wraparound |
+| [pg-throughput-per-connection](skills/pg-throughput-per-connection/SKILL.md) | Getting more throughput per connection, too many connections, slow under load, lock waits, scaling without a bigger instance: one statement per request, commit before non-database work, SKIP LOCKED queues, sharded hot counters, a small measured pool |
 
 ### Workflows: your database, read-only
 
@@ -73,6 +74,21 @@ Or copy `skills/` into wherever your agent loads skills from.
 | [mysql-transactions-and-locking](skills/mysql-transactions-and-locking/SKILL.md) | Opening InnoDB transactions, REPEATABLE READ vs READ COMMITTED and gap locks, SKIP LOCKED queues, NOWAIT, lock wait timeouts (1205) and deadlocks (1213) |
 | [mysql-online-ddl](skills/mysql-online-ddl/SKILL.md) | Changing a schema under live traffic: explicit ALGORITHM and LOCK, INSTANT row-version limits, metadata locks with lock_wait_timeout, invisible indexes before a drop, gh-ost |
 | [mysql-connections](skills/mysql-connections/SKILL.md) | Sizing a fleet's connection pools: the budget, deploy surge, per-account MAX_USER_CONNECTIONS, wait_timeout vs pool lifetime, RDS Proxy pinning |
+
+---
+
+## More volume, fewer connections, no lock waits
+
+The same four API requests written the usual way and the way these skills teach, measured with `pgbench` against PostgreSQL 17 limited to 2 vCPU and 1 GiB (an RDS db.t4g.micro) with 0.5 ms of network latency ([`benchmarks/throughput/`](benchmarks/throughput/)):
+
+| Request | Usual way, best case | With the skills, 4 connections | With the skills, best case | Latency |
+|---|---|---|---|---|
+| Page of orders with items | 2,179 req/s (16 connections) | **5,893 req/s** | **15,047 req/s (6.9×)** | 6.9 ms → **0.68 ms** |
+| Create an order with items | 3,279 req/s (16) | 2,405 req/s | **8,464 req/s (2.6×)** | 4.3 ms → **1.7 ms** |
+| Claim a queued job | ~335 req/s at any pool size, 40 of 64 sessions waiting on locks | **1,656 req/s** | **4,994 req/s (15×)**, no lock waits | 47 ms → **3.2 ms** |
+| Decrement a hot counter | 1,671 req/s, worse with more connections | **2,372 req/s** | **6,681 req/s (4×)** | 11 ms → **2.4 ms** |
+
+With 4 connections the one-statement page serves 3.2 times what the N+1 page serves with 64. On this instance, 64 connections gave less throughput than 16 in every case: a small pool with short holds beats a big one. The rules are in [pg-throughput-per-connection](skills/pg-throughput-per-connection/SKILL.md).
 
 ---
 

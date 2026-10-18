@@ -54,6 +54,7 @@ Ou copie `skills/` para o local de onde o seu agente carrega skills.
 | [pg-observability](skills/pg-observability/SKILL.md) | Descobrir as queries que mais custam: pg_stat_statements por tempo total, track_io_timing, log de queries lentas, auto_explain com amostragem, EXPLAIN ANALYZE seguro, wait events, pg_stat_io, RDS Database Insights |
 | [pg-config-by-size](skills/pg-config-by-size/SKILL.md) | Dimensionar shared_buffers, effective_cache_size, work_mem e maintenance_work_mem pela instância, aumentar work_mem para uma única query, parameter groups no RDS e Aurora, I/O assíncrono do PG 18 |
 | [pg-vacuum-and-bloat](skills/pg-vacuum-and-bloat/SKILL.md) | Evitar o inchaço das tabelas: autovacuum ajustado por tabela quente, sem sessões longas ou idle in transaction, updates HOT com fillfactor, deletes em lotes, sem VACUUM FULL em tabelas em uso, wraparound de XID |
+| [pg-throughput-per-connection](skills/pg-throughput-per-connection/SKILL.md) | Tirar mais vazão de cada conexão, conexões demais, lentidão sob carga, espera por locks, escalar sem instância maior: um comando por requisição, commit antes de trabalho fora do banco, filas com SKIP LOCKED, contadores quentes particionados, pool pequeno e medido |
 
 ### Fluxos: o seu banco, só leitura
 
@@ -73,6 +74,21 @@ Ou copie `skills/` para o local de onde o seu agente carrega skills.
 | [mysql-transactions-and-locking](skills/mysql-transactions-and-locking/SKILL.md) | Abrir transações InnoDB, REPEATABLE READ ou READ COMMITTED e gap locks, filas com SKIP LOCKED, NOWAIT, lock wait timeout (1205) e deadlock (1213) |
 | [mysql-online-ddl](skills/mysql-online-ddl/SKILL.md) | Alterar o schema com tráfego ativo: ALGORITHM e LOCK explícitos, limite de versões de linha do INSTANT, metadata locks com lock_wait_timeout, índices invisíveis antes do drop, gh-ost |
 | [mysql-connections](skills/mysql-connections/SKILL.md) | Dimensionar os pools de conexão da frota: orçamento, pico do deploy, MAX_USER_CONNECTIONS por conta, wait_timeout contra o tempo de vida do pool, pinning do RDS Proxy |
+
+---
+
+## Mais volume, menos conexões, sem esperar lock
+
+As mesmas quatro requisições de API escritas do jeito comum e do jeito que estas skills ensinam, medidas com `pgbench` contra um PostgreSQL 17 limitado a 2 vCPU e 1 GiB (um RDS db.t4g.micro) com 0,5 ms de latência de rede ([`benchmarks/throughput/`](benchmarks/throughput/)):
+
+| Requisição | Jeito comum, melhor caso | Com as skills, 4 conexões | Com as skills, melhor caso | Latência |
+|---|---|---|---|---|
+| Página de pedidos com itens | 2.179 req/s (16 conexões) | **5.893 req/s** | **15.047 req/s (6,9×)** | 6,9 ms → **0,68 ms** |
+| Criar um pedido com itens | 3.279 req/s (16) | 2.405 req/s | **8.464 req/s (2,6×)** | 4,3 ms → **1,7 ms** |
+| Pegar um job da fila | ~335 req/s com qualquer pool, 40 de 64 sessões esperando lock | **1.656 req/s** | **4.994 req/s (15×)**, sem espera por lock | 47 ms → **3,2 ms** |
+| Decrementar um contador quente | 1.671 req/s, pior com mais conexões | **2.372 req/s** | **6.681 req/s (4×)** | 11 ms → **2,4 ms** |
+
+Com 4 conexões, a página em um comando atende 3,2 vezes o que a página com N+1 atende com 64. Nesta instância, 64 conexões renderam menos que 16 em todos os casos: um pool pequeno com conexões seguradas por pouco tempo vence um pool grande. As regras estão em [pg-throughput-per-connection](skills/pg-throughput-per-connection/SKILL.md).
 
 ---
 

@@ -93,6 +93,15 @@ Where the agent failed without the plugin:
 | Money transfer procedure on MySQL | 1 / 3 | **3 / 3** | No retry of the whole transaction on deadlock 1213, so a concurrent transfer loses money |
 | Singleton job behind PgBouncer | 1 / 3 | **3 / 3** | Session-level `pg_advisory_lock` behind transaction pooling, so the "single" job runs twice |
 
+**Auditing a real database.** [`benchmarks/audit-fixture/`](benchmarks/audit-fixture/) builds a PostgreSQL 17 database with ten planted problems (unindexed foreign key, duplicate and unused indexes, OFFSET pagination, N+1, a session idle in transaction, autovacuum off with dead rows, a fleet over the connection budget, a dangerous global `work_mem`, random UUID keys), runs traffic and exports the standard statistics views. The agent reads the export and writes a report and a migration; one judge per problem plus SQL safety checks (CONCURRENTLY, no VACUUM FULL, no dropped primary keys).
+
+| | Without plugin | With plugin |
+|---|---|---|
+| Runs that found all ten problems and wrote a safe migration | 1 / 3 | **3 / 3** |
+| Checks passed | 45 / 48 | **48 / 48** |
+
+Without the plugin the agent missed the OFFSET pagination, the most expensive statement in the export, in 2 of 3 runs, and the global `work_mem` in 1.
+
 The model already knows most textbook rules; the plugin makes it right every time and closes the gaps that cause production incidents. An earlier round, before the skill descriptions named the key rule and the user's words ("infinite scroll", "next page"), showed no difference and one skill that never loaded; that is why every description now starts with the task and its most important rule.
 
 ---

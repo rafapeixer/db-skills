@@ -93,6 +93,15 @@ Onde o agente errou sem o plugin:
 | Procedure de transferência no MySQL | 1 / 3 | **3 / 3** | Sem retry da transação inteira no deadlock 1213, então uma transferência concorrente perde dinheiro |
 | Job único atrás do PgBouncer | 1 / 3 | **3 / 3** | `pg_advisory_lock` de sessão atrás de pooling por transação, então o job "único" roda duas vezes |
 
+**Auditando um banco real.** O [`benchmarks/audit-fixture/`](benchmarks/audit-fixture/) monta um PostgreSQL 17 com dez problemas plantados (foreign key sem índice, índices duplicado e sem uso, paginação com OFFSET, N+1, uma sessão idle in transaction, autovacuum desligado com linhas mortas, frota acima do orçamento de conexões, `work_mem` global perigoso, chaves UUID aleatórias), roda tráfego e exporta as views padrão de estatística. O agente lê a exportação e escreve um relatório e uma migration; um juiz por problema mais checagens de segurança no SQL (CONCURRENTLY, sem VACUUM FULL, sem apagar chave primária).
+
+| | Sem plugin | Com plugin |
+|---|---|---|
+| Execuções que acharam os dez problemas e escreveram uma migration segura | 1 / 3 | **3 / 3** |
+| Checagens cumpridas | 45 / 48 | **48 / 48** |
+
+Sem o plugin, o agente deixou passar a paginação com OFFSET, a query mais cara da exportação, em 2 de 3 execuções, e o `work_mem` global em 1.
+
 O modelo já conhece a maioria das regras de livro; o plugin faz ele acertar sempre e fecha as brechas que causam incidente em produção. Uma rodada anterior, antes de as descrições das skills trazerem a regra principal e as palavras do usuário ("infinite scroll", "next page"), não mostrou diferença e teve uma skill que nunca carregou; por isso toda descrição agora começa pela tarefa e pela regra mais importante.
 
 ---

@@ -63,9 +63,16 @@ Ou copie `skills/` para o local de onde o seu agente carrega skills.
 | [db-explain](skills/db-explain/SKILL.md) | O plano de um SELECT lento explicado em palavras simples, e o índice ou a reescrita que resolve, como migration; EXPLAIN ANALYZE só com o seu consentimento |
 | [db-connection-budget](skills/db-connection-budget/SKILL.md) | Quantas conexões a sua frota abre no pior momento (autoscaling mais o pico do deploy) contra o que o banco permite, com tamanhos de pool e limites por role |
 
-### Próximas
+### MySQL (v1.1)
 
-- **MySQL (v1.1):** chaves e layout do InnoDB, índices, padrões de query, transações e isolamento, DDL online, conexões.
+| Skill | Use quando |
+|---|---|
+| [mysql-keys-and-types](skills/mysql-keys-and-types/SKILL.md) | Escolher chaves primárias e tipos de coluna no InnoDB: BIGINT AUTO_INCREMENT ou UUID em BINARY(16), utf8mb4, DATETIME ou TIMESTAMP, DECIMAL para dinheiro, strict mode, NOT NULL, CHECK e foreign keys, JSON |
+| [mysql-indexing](skills/mysql-indexing/SKILL.md) | Criar, revisar ou remover índices InnoDB, ou quando o EXPLAIN mostra type ALL, Using filesort ou index_merge inesperados |
+| [mysql-query-patterns](skills/mysql-query-patterns/SKILL.md) | Carregar uma página com seus filhos, paginar (keyset escrito por extenso, sem row constructor), inserir em lote, upsert com o alias AS, colunas nomeadas, EXPLAIN ANALYZE seguro |
+| [mysql-transactions-and-locking](skills/mysql-transactions-and-locking/SKILL.md) | Abrir transações InnoDB, REPEATABLE READ ou READ COMMITTED e gap locks, filas com SKIP LOCKED, NOWAIT, lock wait timeout (1205) e deadlock (1213) |
+| [mysql-online-ddl](skills/mysql-online-ddl/SKILL.md) | Alterar o schema com tráfego ativo: ALGORITHM e LOCK explícitos, limite de versões de linha do INSTANT, metadata locks com lock_wait_timeout, índices invisíveis antes do drop, gh-ost |
+| [mysql-connections](skills/mysql-connections/SKILL.md) | Dimensionar os pools de conexão da frota: orçamento, pico do deploy, MAX_USER_CONNECTIONS por conta, wait_timeout contra o tempo de vida do pool, pinning do RDS Proxy |
 
 ---
 

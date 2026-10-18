@@ -63,9 +63,16 @@ Or copy `skills/` into wherever your agent loads skills from.
 | [db-explain](skills/db-explain/SKILL.md) | The plan of one slow SELECT explained in plain words, and the index or rewrite that fixes it, as a migration; EXPLAIN ANALYZE only with your consent |
 | [db-connection-budget](skills/db-connection-budget/SKILL.md) | How many connections your fleet opens at its worst moment (autoscaling plus deploy surge) against what the database allows, with pool sizes and per-role caps |
 
-### Next
+### MySQL (v1.1)
 
-- **MySQL (v1.1):** keys and InnoDB layout, indexing, query patterns, transactions and isolation, online DDL, connections.
+| Skill | Use when |
+|---|---|
+| [mysql-keys-and-types](skills/mysql-keys-and-types/SKILL.md) | Choosing InnoDB primary keys and column types: BIGINT AUTO_INCREMENT vs BINARY(16) UUIDs, utf8mb4, DATETIME vs TIMESTAMP, DECIMAL money, strict mode, NOT NULL, CHECK and foreign keys, JSON |
+| [mysql-indexing](skills/mysql-indexing/SKILL.md) | Adding, reviewing or removing InnoDB indexes, or EXPLAIN shows type ALL, Using filesort or index_merge you did not expect |
+| [mysql-query-patterns](skills/mysql-query-patterns/SKILL.md) | Loading a page with its children, paginating (keyset written out, not a row constructor), batch inserts, upserts with the AS alias, named columns, safe EXPLAIN ANALYZE |
+| [mysql-transactions-and-locking](skills/mysql-transactions-and-locking/SKILL.md) | Opening InnoDB transactions, REPEATABLE READ vs READ COMMITTED and gap locks, SKIP LOCKED queues, NOWAIT, lock wait timeouts (1205) and deadlocks (1213) |
+| [mysql-online-ddl](skills/mysql-online-ddl/SKILL.md) | Changing a schema under live traffic: explicit ALGORITHM and LOCK, INSTANT row-version limits, metadata locks with lock_wait_timeout, invisible indexes before a drop, gh-ost |
+| [mysql-connections](skills/mysql-connections/SKILL.md) | Sizing a fleet's connection pools: the budget, deploy surge, per-account MAX_USER_CONNECTIONS, wait_timeout vs pool lifetime, RDS Proxy pinning |
 
 ---
 

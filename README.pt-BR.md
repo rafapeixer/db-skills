@@ -90,6 +90,8 @@ As mesmas quatro requisições de API escritas do jeito comum e do jeito que est
 
 Com 4 conexões, a página em um comando atende 3,2 vezes o que a página com N+1 atende com 64. Nesta instância, 64 conexões renderam menos que 16 em todos os casos: um pool pequeno com conexões seguradas por pouco tempo vence um pool grande. As regras estão em [pg-throughput-per-connection](skills/pg-throughput-per-connection/SKILL.md).
 
+**MySQL 8.4**, mesmo tamanho e latência, medido com sysbench ([`benchmarks/throughput/mysql/`](benchmarks/throughput/mysql/)): a página em um comando atende 5.108 req/s com 4 conexões contra 1.743 do N+1 no melhor caso (latência 7,3 ms → 0,78 ms); `SKIP LOCKED` atende 1.937 jobs/s contra cerca de 215, sem espera por lock; 16 partes do contador chegam a 3.113 updates/s enquanto uma linha só fica em cerca de 515. Duas descobertas próprias do MySQL: no REPEATABLE READ padrão as duas versões da fila têm centenas de deadlocks por segundo, então a fila precisa de READ COMMITTED; e cada commit espera o redo log e o binary log, então reduzir round trips ajuda muito menos as escritas do que reduzir commits.
+
 ---
 
 ## Muda o que os agentes escrevem?

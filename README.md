@@ -90,6 +90,8 @@ The same four API requests written the usual way and the way these skills teach,
 
 With 4 connections the one-statement page serves 3.2 times what the N+1 page serves with 64. On this instance, 64 connections gave less throughput than 16 in every case: a small pool with short holds beats a big one. The rules are in [pg-throughput-per-connection](skills/pg-throughput-per-connection/SKILL.md).
 
+**MySQL 8.4**, same size and latency, measured with sysbench ([`benchmarks/throughput/mysql/`](benchmarks/throughput/mysql/)): the one-statement page serves 5,108 req/s with 4 connections against 1,743 for N+1 at its best (latency 7.3 ms → 0.78 ms); `SKIP LOCKED` serves 1,937 claims/s against about 215 with no lock waits; 16 counter shards reach 3,113 updates/s while one row stays at about 515. Two MySQL-specific findings: under the default REPEATABLE READ both queue variants deadlock hundreds of times per second, so the queue needs READ COMMITTED; and each commit waits for the redo and binary logs, so cutting round trips helps writes far less than cutting commits.
+
 ---
 
 ## Does it change what agents write?

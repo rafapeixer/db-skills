@@ -24,7 +24,7 @@ bash benchmarks/throughput/run.sh 0.5ms 20   # network RTT, seconds per point
 | Decrement a hot counter | one row | 1,671 | 1,463 | 1,348 | 2.39 ms | 12.7 |
 | | 16 shards | **2,372** | **6,681** | 6,017 | **1.69 ms** | 22.2 |
 
-Raw numbers: [`results.csv`](results.csv).
+Raw numbers: [`results.csv`](results.csv). MySQL version: [`mysql/`](mysql/).
 
 ## What it shows
 

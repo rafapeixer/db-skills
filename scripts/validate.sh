@@ -33,6 +33,10 @@ check_frontmatter() { # skill file
   if [ "$(head -n 1 "$file")" != "---" ]; then
     fail "$skill" "SKILL.md must start with YAML frontmatter (---)"
   fi
+  # Claude Code fails to parse frontmatter with CRLF and loads the skill with no description.
+  if [ "$(tr -d '\r' <"$file" | wc -c)" -ne "$(wc -c <"$file")" ]; then
+    fail "$skill" "SKILL.md has CRLF line endings; use LF"
+  fi
   frontmatter=$(awk 'NR == 1 { next } /^---$/ { exit } { print }' "$file")
   local name description verified
   name=$(printf '%s\n' "$frontmatter" | sed -n 's/^name: *//p')

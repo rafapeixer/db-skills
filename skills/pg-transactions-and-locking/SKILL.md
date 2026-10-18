@@ -1,6 +1,6 @@
 ---
 name: pg-transactions-and-locking
-description: Use when writing PostgreSQL code with transactions, row locks, work queues, cron or singleton jobs, advisory locks, retries or timeouts. Key rules: no network calls inside a transaction; on 40001/40P01 retry the WHOLE transaction, never just the failed statement; queues claim with FOR UPDATE SKIP LOCKED; NOWAIT or lock_timeout, never an unbounded wait; timeouts via ALTER ROLE ... SET; behind PgBouncer or RDS Proxy use pg_advisory_xact_lock, never session-level pg_advisory_lock.
+description: Use when a PostgreSQL job must run only once at a time across replicas (nightly, cron, singleton, leader), when the app goes through PgBouncer or RDS Proxy, or when writing transactions, row locks, work queues, advisory locks, retries or timeouts. Key rules: behind PgBouncer transaction pooling or RDS Proxy use pg_advisory_xact_lock inside a transaction, never session-level pg_advisory_lock or pg_try_advisory_lock (the lock stays on a server connection another client reuses); no network calls inside a transaction; on 40001/40P01 retry the WHOLE transaction, never just the failed statement; queues claim with FOR UPDATE SKIP LOCKED; NOWAIT or lock_timeout, never an unbounded wait; timeouts via ALTER ROLE ... SET.
 metadata:
   verified: 2026-10-18
 ---

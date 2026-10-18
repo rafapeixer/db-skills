@@ -1,6 +1,6 @@
 ---
 name: mysql-query-patterns
-description: Use when writing any MySQL query for an endpoint or job: lists, pagination, infinite scroll, next page, loading child rows, bulk inserts, upserts. Key rules: write keyset pagination OUT as created_at < ? OR (created_at = ? AND id < ?), because MySQL does not range-scan (created_at, id) < (?, ?) and reads as many rows as OFFSET; never LIMIT offset or OFFSET; one statement per page; multi-row INSERT; INSERT ... AS new ON DUPLICATE KEY UPDATE, not VALUES(); never SELECT *.
+description: Use when writing any MySQL pagination, infinite scroll, next page or "fetch the next N" query, or any MySQL query for an endpoint or job: lists, loading child rows, bulk inserts, upserts. Key rules: write keyset pagination OUT as created_at < ? OR (created_at = ? AND id < ?), because MySQL does not range-scan (created_at, id) < (?, ?) and reads as many rows as OFFSET; never LIMIT offset or OFFSET; one statement per page; multi-row INSERT; INSERT ... AS new ON DUPLICATE KEY UPDATE, not VALUES(); never SELECT *.
 metadata:
   verified: 2026-10-18
 ---

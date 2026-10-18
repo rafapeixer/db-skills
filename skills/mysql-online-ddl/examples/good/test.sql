@@ -94,21 +94,63 @@ CALL assert_true(@errno = 4092, 'INSTANT at the cap fails with 4092');
 CALL assert_true(innodb_table_id('churn') = @churn_id, 'and nothing was rebuilt behind your back');
 
 -- 6. Metadata locks. Another session (an event) holds a transaction that
--- has read orders, so it holds a shared metadata lock until it commits.
+-- has read orders, so it holds a shared metadata lock until it commits. It
+-- stays open until the migration runner below has timed out once, so the
+-- test does not depend on how fast the machine is.
+CREATE TABLE ddl_log (attempt INT NOT NULL, outcome VARCHAR(20) NOT NULL);
+-- Events report progress here, always after their own COMMIT.
+CREATE TABLE steps (name VARCHAR(40) PRIMARY KEY);
 DELIMITER $$
-CREATE PROCEDURE wait_for_other_lock(IN tbl VARCHAR(64), IN wanted_status VARCHAR(16))
+-- Waits (up to 60 s) until an event has taken its '<name> parked' user lock,
+-- which it does once it holds what the test needs it to hold.
+CREATE PROCEDURE wait_for_parked(IN gate VARCHAR(30))
 BEGIN
   DECLARE tries INT DEFAULT 0;
-  WHILE tries < 100 AND NOT EXISTS (
-    SELECT 1 FROM performance_schema.metadata_locks
-    WHERE OBJECT_SCHEMA = DATABASE() AND OBJECT_NAME = tbl
-      AND LOCK_STATUS = wanted_status AND OWNER_THREAD_ID <> PS_CURRENT_THREAD_ID()) DO
-    DO SLEEP(0.05);
+  WHILE IS_USED_LOCK(CONCAT(DATABASE(), '.', gate, ' parked')) IS NULL DO
     SET tries = tries + 1;
+    IF tries > 600 THEN
+      SET @wait_msg = LEFT(CONCAT('never parked: ', gate), 128);
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = @wait_msg;
+    END IF;
+    DO SLEEP(0.1);
   END WHILE;
 END$$
 
--- The migration runner: short lock wait, retry on 1205 with a pause.
+-- Waits (up to 60 s) until an event has recorded a step.
+CREATE PROCEDURE wait_for_step(IN step VARCHAR(40))
+BEGIN
+  DECLARE tries INT DEFAULT 0;
+  WHILE (SELECT COUNT(*) FROM steps WHERE name = step) = 0 DO
+    SET tries = tries + 1;
+    IF tries > 600 THEN
+      SET @wait_msg = LEFT(CONCAT('never happened: ', step), 128);
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = @wait_msg;
+    END IF;
+    DO SLEEP(0.1);
+  END WHILE;
+END$$
+
+-- Kills any event session still connected to this database, so a failed
+-- run never leaves a session holding locks.
+CREATE PROCEDURE cleanup_sessions()
+BEGIN
+  DECLARE done INT DEFAULT 0;
+  DECLARE pid BIGINT;
+  DECLARE c CURSOR FOR SELECT id FROM performance_schema.processlist
+    WHERE db = DATABASE() AND id <> CONNECTION_ID();
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+  OPEN c;
+  sessions: LOOP
+    FETCH c INTO pid;
+    IF done THEN LEAVE sessions; END IF;
+    KILL pid;
+  END LOOP;
+  CLOSE c;
+END$$
+
+-- The migration runner: short lock wait, retry on 1205 with a pause, and a
+-- log row per attempt.
 CREATE PROCEDURE ddl_with_retry(IN stmt TEXT, IN max_attempts INT, OUT attempts INT)
 BEGIN
   DECLARE timed_out BOOLEAN DEFAULT FALSE;
@@ -123,6 +165,7 @@ BEGIN
       EXECUTE s;
       DEALLOCATE PREPARE s;
     END IF;
+    INSERT INTO ddl_log VALUES (attempts, IF(timed_out, 'timed out', 'done'));
     IF NOT timed_out OR attempts >= max_attempts THEN LEAVE retry; END IF;
     DO SLEEP(1);
   END LOOP;
@@ -136,14 +179,22 @@ SET GLOBAL event_scheduler = ON;
 DELIMITER $$
 CREATE EVENT hold ON SCHEDULE AT CURRENT_TIMESTAMP DO
 BEGIN
+  DECLARE tries INT DEFAULT 0;
+  -- READ COMMITTED only so the loop below sees new ddl_log rows.
+  SET SESSION transaction_isolation = 'READ-COMMITTED';
   START TRANSACTION;
   SELECT COUNT(*) INTO @x FROM orders;
-  DO SLEEP(4);
+  DO GET_LOCK(CONCAT(DATABASE(), '.hold parked'), 0);
+  -- Open until the runner logs a timed-out attempt (at most 120 s).
+  WHILE NOT EXISTS (SELECT 1 FROM ddl_log WHERE outcome = 'timed out') AND tries < 1200 DO
+    SET tries = tries + 1;
+    DO SLEEP(0.1);
+  END WHILE;
   COMMIT;
+  INSERT INTO steps VALUES ('hold committed');
 END$$
 DELIMITER ;
-CALL wait_for_other_lock('orders', 'GRANTED');
-DO SLEEP(1);
+CALL wait_for_parked('hold');
 
 SET SESSION lock_wait_timeout = 1;
 CALL assert_error('ALTER TABLE orders ADD COLUMN shipped_at DATETIME NULL, ALGORITHM=INSTANT',
@@ -158,3 +209,7 @@ CALL assert_true((SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'shipped_at') = 1,
   'column added after the long transaction committed');
 CALL assert_true(innodb_table_id('orders') = @orders_id, 'still the original table: no copy all along');
+
+CALL wait_for_step('hold committed');
+CALL cleanup_sessions();
+DROP EVENT IF EXISTS hold;

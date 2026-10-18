@@ -46,7 +46,7 @@ The user gets the plan of one query explained in plain words: where the time or 
    - MySQL: `01-indexes-for-tables`, `02-table-stats`, `03-planner-settings`, `04-statement-stats`.
 5. **Plain plan.** Build the statement at run time from the user's query:
    - PostgreSQL: `EXPLAIN (FORMAT JSON, SETTINGS) <query>`; with parameters on 16+, `EXPLAIN (GENERIC_PLAN, FORMAT JSON) <query>`.
-   - MySQL: `EXPLAIN FORMAT=JSON <query>`; add `EXPLAIN FORMAT=TREE <query>` when the JSON is hard to read.
+   - MySQL: `EXPLAIN FORMAT=JSON <query>`; add `EXPLAIN FORMAT=TREE <query>` when the JSON is hard to read. MySQL 9.x defaults the JSON to layout version 2, which has no `access_type` or `key` fields; run `SET SESSION explain_json_format_version = 1;` first so the plan has the fields this workflow reads ([explain_json_format_version](https://dev.mysql.com/doc/refman/9.7/en/server-system-variables.html#sysvar_explain_json_format_version)).
 6. **Measured plan, only with consent.** Offer it when estimates and reality may differ, for example a large row-estimate gap or a production mean far from the plan's cost. Show the exact block, then run it only on a yes:
 
    ```sql

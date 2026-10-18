@@ -1,5 +1,6 @@
 ---
-max_turns: 30
+max_turns: 45
+timeout_seconds: 900
 allowed_tools: [Read, Glob, Grep, Skill, Write]
 ---
 Our DBA exported statistics from our production PostgreSQL 17 database into the `export/` folder: `pg_stat_statements.csv`, `indexes.csv`, `tables.csv`, `activity.csv`, `settings.csv`, `schema.sql`, and our service's `deploy.yaml`. The database runs on 2 vCPU and 4 GiB of RAM and serves live traffic.

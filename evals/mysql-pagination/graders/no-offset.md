@@ -1,7 +1,7 @@
 ---
 type: regex
 target: { source: file, path: query.sql }
-pattern: '\bOFFSET\b|LIMIT\s+\S+\s*,'
-flags: i
+pattern: '^(?!\s*--).*(?:\bOFFSET\b|LIMIT\s+\S+\s*,)'
+flags: im
 match: not_contains
 ---

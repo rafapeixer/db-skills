@@ -1,7 +1,7 @@
 ---
 type: regex
 target: { source: file, path: query.sql }
-pattern: '\bOFFSET\b'
-flags: i
+pattern: '^(?!\s*--).*(?:\bOFFSET\b)'
+flags: im
 match: not_contains
 ---

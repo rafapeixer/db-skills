@@ -1,6 +1,6 @@
 ---
 name: pg-keys-and-types
-description: Use when creating or reviewing PostgreSQL tables, columns or migrations that choose a primary key or a column type. Covers bigint identity vs serial, uuidv7 vs random UUID keys, timestamptz, text with CHECK instead of varchar(n), numeric for money, NOT NULL, CHECK and foreign key constraints, and when jsonb is the right type.
+description: Use when creating or altering a PostgreSQL table or choosing a column type or primary key (CREATE TABLE, schema.sql, migrations). Key rules: bigint GENERATED ALWAYS AS IDENTITY, not serial; UUID keys default to uuidv7() on PG 18+ (gen_random_uuid() keys made the index 39% bigger in our test); timestamptz, not timestamp; text with CHECK, not varchar(n); numeric for money; NOT NULL, CHECK and foreign keys, with an index on every FK column.
 metadata:
   verified: 2026-10-18
 ---

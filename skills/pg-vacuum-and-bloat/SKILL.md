@@ -1,6 +1,6 @@
 ---
 name: pg-vacuum-and-bloat
-description: Use when a PostgreSQL table or index keeps growing, when designing an update-heavy or delete-heavy table, when reviewing autovacuum settings, long transactions, mass DELETE or UPDATE jobs, or a proposal to run VACUUM FULL. Covers per-table autovacuum tuning, the xmin horizon held by open transactions, HOT updates and fillfactor, batched purges, and transaction ID wraparound monitoring.
+description: Use when a PostgreSQL table or index keeps growing, designing update- or delete-heavy tables, writing mass DELETE or UPDATE jobs, or someone proposes VACUUM FULL. Key rules: never disable autovacuum, tune it per hot table; an open or idle-in-transaction session stops vacuum from removing any dead row, so set idle_in_transaction_session_timeout; fillfactor below 100 and no index on hot-updated columns for HOT updates; delete in batches; never VACUUM FULL a live table.
 metadata:
   verified: 2026-10-18
 ---

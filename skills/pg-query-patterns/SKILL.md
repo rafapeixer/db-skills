@@ -1,6 +1,6 @@
 ---
 name: pg-query-patterns
-description: Use when writing or reviewing PostgreSQL queries that load a page of rows with their children, paginate a list, insert or update many rows, upsert, read back what was just written, or select columns. Covers one statement per page with LEFT JOIN LATERAL and array_agg or json_agg instead of N+1 or a second query, keyset pagination instead of OFFSET, multi-row INSERT, unnest arrays and COPY instead of row-by-row writes, INSERT ... ON CONFLICT for upserts, RETURNING (old/new on PG 18+) instead of a read-back, and named columns instead of SELECT *.
+description: Use when writing any PostgreSQL query for an endpoint or job: lists, pagination, infinite scroll, next page, loading child rows, bulk inserts, upserts. Key rules: one statement per page (LEFT JOIN LATERAL with array_agg) instead of N+1 or a second query; keyset WHERE (created_at, id) < ($1, $2) instead of OFFSET (OFFSET 9980 read 10,000 rows for 20); batch writes with unnest or COPY; INSERT ... ON CONFLICT upserts; RETURNING instead of a read-back; never SELECT *.
 metadata:
   verified: 2026-10-18
 ---

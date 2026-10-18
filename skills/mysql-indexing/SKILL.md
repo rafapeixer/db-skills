@@ -1,6 +1,6 @@
 ---
 name: mysql-indexing
-description: Use when adding, reviewing or removing MySQL (InnoDB) indexes, writing a migration that creates one, or EXPLAIN shows type ALL, Using filesort or index_merge you did not expect. Covers composite column order and the leftmost-prefix rule, covering indexes and the implicit primary key, functional and descending indexes, predicates that disable an index (functions, implicit type conversion), and dropping indexes safely with INVISIBLE and the sys schema.
+description: Use when adding, choosing or dropping a MySQL index, or EXPLAIN shows type ALL, Using filesort or index_merge. Key rules: equality columns first, then one range or ORDER BY column; never add the primary key to a secondary index (InnoDB already stores it); keep indexed columns bare and of the same type (VARCHAR column = 4242 is a full scan, compare with '4242'); functional indexes for expressions; one composite index instead of index_merge; INVISIBLE before DROP INDEX.
 metadata:
   verified: 2026-10-18
 ---

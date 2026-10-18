@@ -1,6 +1,6 @@
 ---
 name: pg-online-migrations
-description: Use when writing or reviewing a PostgreSQL schema migration that runs against a table serving live traffic, such as adding a column, constraint, NOT NULL or index, or renaming or retyping a column. Covers lock_timeout with retries, the lock level of each ALTER TABLE form, which ADD COLUMN forms rewrite the table, NOT VALID then VALIDATE CONSTRAINT, NOT NULL without a scan, CREATE INDEX CONCURRENTLY and INVALID indexes, UNIQUE and PRIMARY KEY USING INDEX, and expand/contract.
+description: Use when writing any PostgreSQL migration for a table in production: adding a column, index, constraint, NOT NULL or foreign key, renaming or changing a type. Key rules: SET lock_timeout and retry on 55P03; CREATE INDEX CONCURRENTLY outside a transaction; ADD FOREIGN KEY/CHECK ... NOT VALID, then VALIDATE CONSTRAINT; NOT NULL via a validated CHECK, or on PG 18+ ADD CONSTRAINT ... NOT NULL col NOT VALID then VALIDATE; constant defaults only; expand/contract for renames and type changes.
 metadata:
   verified: 2026-10-18
 ---

@@ -1,6 +1,6 @@
 ---
 name: mysql-transactions-and-locking
-description: Use when writing or reviewing MySQL (InnoDB) code that opens transactions, picks an isolation level, locks rows with SELECT ... FOR UPDATE, builds a work queue, handles deadlocks or lock wait timeouts, or sets lock timeouts. Covers short explicit transactions and autocommit, REPEATABLE READ gap and next-key locks vs READ COMMITTED, FOR UPDATE SKIP LOCKED queues and NOWAIT, per-session innodb_lock_wait_timeout and lock_wait_timeout, ROLLBACK after 1205, whole-transaction retry on 1213, and consistent lock order.
+description: Use when writing MySQL code with transactions, SELECT ... FOR UPDATE, work queues, isolation levels, money transfers, deadlocks or lock wait timeouts. Key rules: REPEATABLE READ gap locks block inserts, so run hot write paths under READ COMMITTED on purpose; queues use FOR UPDATE SKIP LOCKED; set innodb_lock_wait_timeout per session (default 50 s); after 1205 ROLLBACK the whole transaction, because only the statement was undone; retry the whole transaction on 1213; lock rows in one order.
 metadata:
   verified: 2026-10-18
 ---

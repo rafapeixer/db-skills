@@ -1,6 +1,6 @@
 ---
 name: mysql-connections
-description: Use when sizing connection pools for an application fleet on MySQL, choosing max_connections on RDS or Aurora, adding replicas or worker processes, setting per-account connection limits, or deciding whether to put RDS Proxy in front. Covers the connection budget formula, deploy surge, MAX_USER_CONNECTIONS, wait_timeout versus pool lifetime, and RDS Proxy pinning.
+description: Use when sizing MySQL connection pools, adding replicas or worker processes, setting max_connections, or seeing 'Too many connections'. Key rules: (replicas + deploy surge) x processes x pool max must fit max_connections minus an admin reserve (the RDS default is about 60 on a 1 GiB instance class); MAX_USER_CONNECTIONS per account; never give the application CONNECTION_ADMIN; pool max lifetime below wait_timeout; RDS Proxy pins sessions on SET, prepared statements and temporary tables.
 metadata:
   verified: 2026-10-18
 ---

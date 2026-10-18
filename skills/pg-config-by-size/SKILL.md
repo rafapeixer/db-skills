@@ -1,6 +1,6 @@
 ---
 name: pg-config-by-size
-description: Use when sizing or reviewing PostgreSQL memory and I/O settings for an instance, writing a postgresql.conf or RDS parameter group, raising work_mem for a slow sort or hash, or picking an instance class. Covers shared_buffers and effective_cache_size from RAM, the work_mem budget across connections and SET LOCAL, maintenance_work_mem, random_page_cost with evidence, PG 18 async I/O defaults, and RDS/Aurora parameter groups.
+description: Use when setting PostgreSQL memory settings, writing a postgresql.conf or RDS parameter group, picking an instance size, or a sort or hash spills to disk. Key rules: shared_buffers about 25% of RAM; work_mem multiplies by connections x sort/hash nodes, so raise it for one query with SET LOCAL inside its transaction, never globally; effective_cache_size is only a planner hint; on RDS change the parameter group and use only AWS-documented formulas.
 metadata:
   verified: 2026-10-18
 ---

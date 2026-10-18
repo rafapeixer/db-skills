@@ -1,6 +1,6 @@
 ---
 name: pg-transactions-and-locking
-description: Use when writing or reviewing PostgreSQL code that opens transactions, picks an isolation level, locks rows or tables, builds a work queue, uses advisory locks, or sets statement, lock, idle or transaction timeouts. Covers short transactions with no network calls inside, READ COMMITTED vs REPEATABLE READ/SERIALIZABLE with whole-transaction retry on 40001, FOR UPDATE SKIP LOCKED queues, NOWAIT and lock_timeout, per-role timeouts, and transaction-scoped advisory locks behind poolers.
+description: Use when writing PostgreSQL code with transactions, row locks, work queues, cron or singleton jobs, advisory locks, retries or timeouts. Key rules: no network calls inside a transaction; on 40001/40P01 retry the WHOLE transaction, never just the failed statement; queues claim with FOR UPDATE SKIP LOCKED; NOWAIT or lock_timeout, never an unbounded wait; timeouts via ALTER ROLE ... SET; behind PgBouncer or RDS Proxy use pg_advisory_xact_lock, never session-level pg_advisory_lock.
 metadata:
   verified: 2026-10-18
 ---

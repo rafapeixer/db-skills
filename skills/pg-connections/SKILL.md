@@ -1,6 +1,6 @@
 ---
 name: pg-connections
-description: Use when sizing connection pools for an application fleet on PostgreSQL, choosing max_connections on RDS, adding replicas or worker processes, or deciding whether to put PgBouncer or RDS Proxy in front. Covers the connection budget formula, deploy surge, per-role CONNECTION LIMIT, transaction pooling limits and RDS Proxy pinning.
+description: Use when sizing database connection pools, adding replicas or worker processes, configuring PgBouncer or RDS Proxy, or seeing 'too many clients'. Key rules: (replicas + deploy surge) x processes per replica x pool max must fit max_connections minus reserved and admin slots, so a 2-worker service needs a pool of max_connections / (2 x replicas) at most; per-role CONNECTION LIMIT; transaction pooling breaks session SET, LISTEN and advisory locks; any SET pins an RDS Proxy session, so put timeouts on the role.
 metadata:
   verified: 2026-10-18
 ---

@@ -1,6 +1,6 @@
 ---
 name: pg-observability
-description: Use when setting up or reading PostgreSQL query monitoring, finding which queries cost the most, or about to run EXPLAIN ANALYZE against a real database. Covers pg_stat_statements ranked by total_exec_time and its normalization limits, track_io_timing, log_min_duration_statement and sampled auto_explain, safe EXPLAIN (ANALYZE, BUFFERS), wait events in pg_stat_activity, pg_stat_io (PG 16+, changed in 18), and RDS Database Insights.
+description: Use when finding slow or expensive PostgreSQL queries, setting up query monitoring, or about to run EXPLAIN ANALYZE on a real database. Key rules: rank pg_stat_statements by total_exec_time, not mean_exec_time; EXPLAIN ANALYZE executes the statement, so never on production writes (even inside BEGIN/ROLLBACK sequences advance); turn on track_io_timing; log_min_duration_statement as a backstop; sampled auto_explain for slow plans.
 metadata:
   verified: 2026-10-18
 ---

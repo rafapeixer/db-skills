@@ -1,6 +1,6 @@
 ---
 name: pg-indexing
-description: Use when adding, reviewing or removing PostgreSQL indexes, writing a migration that creates one, or a query plan shows a Seq Scan or Sort you did not expect. Covers composite column order (equality, then range, then sort), covering INCLUDE indexes, partial and expression indexes, foreign key indexes, duplicate and unused indexes, and B-tree skip scan (PG 18+).
+description: Use when adding, choosing or dropping a PostgreSQL index, or a query is slow or its plan shows Seq Scan or Sort. Key rules: equality columns first, then the one range or ORDER BY column (wrong order read 837 buffers instead of 4 in our test); INCLUDE for index-only scans; partial and expression indexes must match the query text; index every foreign key column; drop prefix-duplicate and unused indexes; on live tables CREATE INDEX CONCURRENTLY.
 metadata:
   verified: 2026-10-18
 ---

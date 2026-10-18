@@ -1,6 +1,6 @@
 ---
 name: mysql-keys-and-types
-description: Use when creating or reviewing MySQL (InnoDB) tables, columns or migrations that choose a primary key or a column type. Covers BIGINT AUTO_INCREMENT vs UUID keys and BINARY(16) with UUID_TO_BIN(x, 1), utf8mb4 and its collation, DATETIME vs TIMESTAMP, DECIMAL for money, strict SQL mode, NOT NULL, CHECK and foreign key constraints, and when JSON is the right type.
+description: Use when creating or altering a MySQL table or choosing a primary key or column type (CREATE TABLE, schema.sql, migrations). Key rules: BIGINT UNSIGNED AUTO_INCREMENT clustered key; UUID keys as BINARY(16) with UUID_TO_BIN(UUID(), 1) and BIN_TO_UUID(id, 1) (MySQL UUID() is version 1; CHAR(36) keys made every index 60-72% bigger in our test); utf8mb4; DATETIME(6) in UTC, not TIMESTAMP (2038); DECIMAL for money; strict mode; NOT NULL, CHECK, FKs to unique keys.
 metadata:
   verified: 2026-10-18
 ---

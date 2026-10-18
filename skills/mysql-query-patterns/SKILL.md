@@ -1,6 +1,6 @@
 ---
 name: mysql-query-patterns
-description: Use when writing or reviewing MySQL queries that load a page of rows with their children, paginate a list, insert or upsert many rows, select columns, pick random rows, or measure a query with EXPLAIN ANALYZE. Covers one statement per page with a correlated JSON_ARRAYAGG subquery instead of N+1, keyset pagination written as an expanded OR (MySQL does not range-scan a row-constructor comparison) instead of OFFSET, multi-row INSERT bounded by max_allowed_packet, INSERT ... AS new ON DUPLICATE KEY UPDATE instead of the deprecated VALUES() and never on tables with several unique keys, named columns instead of SELECT *, EXPLAIN ANALYZE only in a sandbox, and no ORDER BY RAND() on large tables.
+description: Use when writing any MySQL query for an endpoint or job: lists, pagination, infinite scroll, next page, loading child rows, bulk inserts, upserts. Key rules: write keyset pagination OUT as created_at < ? OR (created_at = ? AND id < ?), because MySQL does not range-scan (created_at, id) < (?, ?) and reads as many rows as OFFSET; never LIMIT offset or OFFSET; one statement per page; multi-row INSERT; INSERT ... AS new ON DUPLICATE KEY UPDATE, not VALUES(); never SELECT *.
 metadata:
   verified: 2026-10-18
 ---

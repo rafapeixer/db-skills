@@ -1,6 +1,6 @@
 ---
 name: mysql-online-ddl
-description: Use when writing or reviewing a MySQL schema change that runs against a table serving live traffic, such as adding or dropping a column or index, widening a VARCHAR, or changing a column's type. Covers explicit ALGORITHM and LOCK clauses, INSTANT and its row-version cap, which changes are COPY, metadata locks with lock_wait_timeout and retries, INVISIBLE indexes before a drop, expand/contract, and gh-ost for changes MySQL cannot do online.
+description: Use when writing any MySQL migration for a table in production: adding or dropping a column or index, widening or changing a column. Key rules: always state ALGORITHM so MySQL errors instead of silently copying the table: ALGORITHM=INSTANT with no LOCK clause (INSTANT with LOCK=NONE is an error), otherwise ALGORITHM=INPLACE, LOCK=NONE; SET SESSION lock_wait_timeout low and retry, because a waiting ALTER blocks every query behind it; type changes are COPY: use expand/contract or gh-ost; INVISIBLE before DROP INDEX.
 metadata:
   verified: 2026-10-18
 ---

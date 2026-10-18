@@ -76,6 +76,27 @@ Ou copie `skills/` para o local de onde o seu agente carrega skills.
 
 ---
 
+## Muda o que os agentes escrevem?
+
+Medido com `claude plugin eval` ([`evals/`](evals/)): cada tarefa roda com e sem o plugin, 3 vezes por lado, e graders por regex conferem o arquivo SQL que o agente escreve. Outubro de 2026.
+
+| | Sem plugin | Com plugin |
+|---|---|---|
+| 8 tarefas de base (índice online, FK, NOT NULL, paginação nos dois bancos, coluna INSTANT no MySQL, chave UUID, fila de jobs) | 24 / 24 | **24 / 24** |
+| 9 tarefas com armadilhas conhecidas | 23 / 27 | **27 / 27** |
+| **Todas as 51 execuções** | **47 / 51 (92%)** | **51 / 51 (100%)** |
+
+Onde o agente errou sem o plugin:
+
+| Tarefa | Sem | Com | A falha |
+|---|---|---|---|
+| Procedure de transferência no MySQL | 1 / 3 | **3 / 3** | Sem retry da transação inteira no deadlock 1213, então uma transferência concorrente perde dinheiro |
+| Job único atrás do PgBouncer | 1 / 3 | **3 / 3** | `pg_advisory_lock` de sessão atrás de pooling por transação, então o job "único" roda duas vezes |
+
+O modelo já conhece a maioria das regras de livro; o plugin faz ele acertar sempre e fecha as brechas que causam incidente em produção. Uma rodada anterior, antes de as descrições das skills trazerem a regra principal e as palavras do usuário ("infinite scroll", "next page"), não mostrou diferença e teve uma skill que nunca carregou; por isso toda descrição agora começa pela tarefa e pela regra mais importante.
+
+---
+
 ## Segurança dos fluxos
 
 Os fluxos conectam no seu banco, então a segurança é garantida pelo banco, não por promessa:

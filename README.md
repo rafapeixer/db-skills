@@ -76,6 +76,27 @@ Or copy `skills/` into wherever your agent loads skills from.
 
 ---
 
+## Does it change what agents write?
+
+Measured with `claude plugin eval` ([`evals/`](evals/)): each task runs with and without the plugin, 3 times per side, and regex graders check the SQL file the agent writes. October 2026.
+
+| | Without plugin | With plugin |
+|---|---|---|
+| 8 core tasks (online index, FK, NOT NULL, pagination in both engines, MySQL INSTANT column, UUID key, job queue) | 24 / 24 | **24 / 24** |
+| 9 tasks with known traps | 23 / 27 | **27 / 27** |
+| **All 51 runs** | **47 / 51 (92%)** | **51 / 51 (100%)** |
+
+Where the agent failed without the plugin:
+
+| Task | Without | With | The failure |
+|---|---|---|---|
+| Money transfer procedure on MySQL | 1 / 3 | **3 / 3** | No retry of the whole transaction on deadlock 1213, so a concurrent transfer loses money |
+| Singleton job behind PgBouncer | 1 / 3 | **3 / 3** | Session-level `pg_advisory_lock` behind transaction pooling, so the "single" job runs twice |
+
+The model already knows most textbook rules; the plugin makes it right every time and closes the gaps that cause production incidents. An earlier round, before the skill descriptions named the key rule and the user's words ("infinite scroll", "next page"), showed no difference and one skill that never loaded; that is why every description now starts with the task and its most important rule.
+
+---
+
 ## Safety of the workflows
 
 The workflows connect to your database, so their safety is enforced by the database, not by promises:

@@ -12,9 +12,9 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 # Oldest supported major that RDS offers, and the newest major.
-PG_VERSIONS=${PG_VERSIONS:-"15 18"}
+PG_VERSIONS=${PG_VERSIONS-"15 18"}
 # Both LTS lines: 8.4 (the floor) and 9.7.
-MYSQL_VERSIONS=${MYSQL_VERSIONS:-"8.4 9.7"}
+MYSQL_VERSIONS=${MYSQL_VERSIONS-"8.4 9.7"}
 
 errors=0
 fail() {

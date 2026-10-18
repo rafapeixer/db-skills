@@ -4,6 +4,9 @@
 
 -- Examples generate data with recursive CTEs; allow them to be deep.
 SET SESSION cte_max_recursion_depth = 10000000;
+-- MySQL 9.x defaults EXPLAIN FORMAT=JSON to layout version 2, which has no
+-- access_type or key fields; plan_has reads the version 1 layout.
+SET SESSION explain_json_format_version = 1;
 
 DELIMITER $$
 
@@ -21,6 +24,30 @@ END$$
 CREATE FUNCTION plan_has(plan JSON, needle VARCHAR(255)) RETURNS BOOLEAN DETERMINISTIC
 BEGIN
   RETURN JSON_SEARCH(plan, 'one', needle) IS NOT NULL;
+END$$
+
+-- assert_error runs a statement that must fail with the given SQLSTATE
+-- (for example '23000' duplicate key, 'HY000' with a lock timeout, '22001'
+-- data too long). The statement runs through PREPARE, so it must be a
+-- statement that can be prepared (most DML and DDL can).
+CREATE PROCEDURE assert_error(IN stmt TEXT, IN expected_sqlstate CHAR(5), IN msg VARCHAR(255))
+BEGIN
+  DECLARE got CHAR(5) DEFAULT NULL;
+  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    GET DIAGNOSTICS CONDITION 1 got = RETURNED_SQLSTATE;
+  SET @assert_stmt = stmt;
+  PREPARE s FROM @assert_stmt;
+  IF got IS NULL THEN
+    EXECUTE s;
+    DEALLOCATE PREPARE s;
+  END IF;
+  IF got IS NULL THEN
+    SET @assert_msg = LEFT(CONCAT('assertion failed: ', msg, ': statement succeeded'), 128);
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = @assert_msg;
+  ELSEIF got <> expected_sqlstate THEN
+    SET @assert_msg = LEFT(CONCAT('assertion failed: ', msg, ': expected ', expected_sqlstate, ', got ', got), 128);
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = @assert_msg;
+  END IF;
 END$$
 
 DELIMITER ;

@@ -1,0 +1,10 @@
+{
+  "name": "db-skills",
+  "version": "0.1.0",
+  "description": "Opinionated PostgreSQL and MySQL skills for coding agents, plus read-only audit workflows for your own database.",
+  "author": { "name": "Rafael Peixer", "url": "https://github.com/rafapeixer" },
+  "homepage": "https://github.com/rafapeixer/db-skills",
+  "repository": "https://github.com/rafapeixer/db-skills",
+  "license": "MIT",
+  "keywords": ["postgresql", "postgres", "mysql", "sql", "database", "performance", "rds", "aurora"]
+}

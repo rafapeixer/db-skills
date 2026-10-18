@@ -1,0 +1,14 @@
+# Local agent settings
+CLAUDE.local.md
+.claude/settings.local.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Eval and benchmark output
+evals/results/
+benchmarks/**/results/
+*.log

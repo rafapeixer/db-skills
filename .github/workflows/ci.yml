@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash scripts/validate.sh
+
+  examples:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        engine: [pg, mysql]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run examples against real databases
+        run: |
+          if [ "${{ matrix.engine }}" = pg ]; then export MYSQL_VERSIONS=""; else export PG_VERSIONS=""; fi
+          bash scripts/test-examples.sh

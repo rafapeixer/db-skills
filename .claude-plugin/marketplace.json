@@ -1,0 +1,12 @@
+{
+  "name": "db-skills",
+  "owner": { "name": "Rafael Peixer", "url": "https://github.com/rafapeixer" },
+  "description": "Opinionated PostgreSQL and MySQL skills for coding agents.",
+  "plugins": [
+    {
+      "name": "db-skills",
+      "source": "./",
+      "description": "Opinionated PostgreSQL and MySQL skills for coding agents, plus read-only audit workflows for your own database."
+    }
+  ]
+}

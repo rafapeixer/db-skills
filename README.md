@@ -21,7 +21,7 @@ Works with Claude Code, Cursor, Codex and any agent that reads `SKILL.md` files,
 /plugin install db-skills@db-skills
 ```
 
-Decision skills load automatically when the task matches. Workflows run on request:
+Decision skills load automatically when the task matches; a short note at session start (about 1,000 characters, [`hooks/session-context.md`](hooks/session-context.md)) lists the traps and reminds the agent to load them. Workflows run on request:
 
 ```
 /db-skills:db-audit
@@ -97,31 +97,33 @@ With 4 connections the one-statement page serves 3.2 times what the N+1 page ser
 
 ## Does it change what agents write?
 
-Measured with `claude plugin eval` ([`evals/`](evals/)): each task runs with and without the plugin, 3 times per side, and regex graders check the SQL file the agent writes. October 2026.
+Measured with `claude plugin eval` ([`evals/`](evals/)): each task runs with and without the plugin, **10 times per side**, and regex graders check the SQL file the agent writes. October 2026.
 
 | | Without plugin | With plugin |
 |---|---|---|
-| 8 core tasks (online index, FK, NOT NULL, pagination in both engines, MySQL INSTANT column, UUID key, job queue) | 24 / 24 | **24 / 24** |
-| 9 tasks with known traps | 23 / 27 | **27 / 27** |
-| **All 51 runs** | **47 / 51 (92%)** | **51 / 51 (100%)** |
+| 9 core tasks (online index, FK, NOT NULL, pagination in both engines, MySQL INSTANT column, UUID key, job queues in both engines) | 88 / 90 | **90 / 90** |
+| 10 tasks with known traps | 87 / 100 | **100 / 100** |
+| **All 190 runs** | **175 / 190 (92%)** | **190 / 190 (100%)** |
 
 Where the agent failed without the plugin:
 
 | Task | Without | With | The failure |
 |---|---|---|---|
-| Money transfer procedure on MySQL | 1 / 3 | **3 / 3** | No retry of the whole transaction on deadlock 1213, so a concurrent transfer loses money |
-| Singleton job behind PgBouncer | 1 / 3 | **3 / 3** | Session-level `pg_advisory_lock` behind transaction pooling, so the "single" job runs twice |
+| Money transfer procedure on MySQL | 2 / 10 | **10 / 10** | No retry of the whole transaction on deadlock 1213, so a concurrent transfer loses money |
+| Singleton job behind PgBouncer | 6 / 10 | **10 / 10** | Session-level `pg_advisory_lock` behind transaction pooling, so the "single" job runs twice |
+| Infinite scroll on MySQL | 8 / 10 | **10 / 10** | `OFFSET`, or the row constructor `(created_at, id) < (?, ?)` that MySQL does not range-scan |
+| Flash-sale stock counter | 9 / 10 | **10 / 10** | One hot row that serializes every purchase |
 
-**Auditing a real database.** [`benchmarks/audit-fixture/`](benchmarks/audit-fixture/) builds a PostgreSQL 17 database with ten planted problems (unindexed foreign key, duplicate and unused indexes, OFFSET pagination, N+1, a session idle in transaction, autovacuum off with dead rows, a fleet over the connection budget, a dangerous global `work_mem`, random UUID keys), runs traffic and exports the standard statistics views. The agent reads the export and writes a report and a migration; one judge per problem plus SQL safety checks (CONCURRENTLY, no VACUUM FULL, no dropped primary keys).
+**Auditing a real database.** [`benchmarks/audit-fixture/`](benchmarks/audit-fixture/) builds a PostgreSQL 17 database with ten planted problems (unindexed foreign key, duplicate and unused indexes, OFFSET pagination, N+1, a session idle in transaction, autovacuum off with dead rows, a fleet over the connection budget, a dangerous global `work_mem`, random UUID keys), runs traffic and exports the standard statistics views. The agent reads the export and writes a report and a migration; one judge per problem plus SQL safety checks (CONCURRENTLY, also in rollbacks; no VACUUM FULL; no dropped primary keys). 10 runs per side.
 
 | | Without plugin | With plugin |
 |---|---|---|
-| Runs that found all ten problems and wrote a safe migration | 1 / 3 | **3 / 3** |
-| Checks passed | 45 / 48 | **48 / 48** |
+| Runs that found all ten problems and wrote a safe migration | 6 / 10 | **9 / 10** |
+| Checks passed | 156 / 160 | **159 / 160** |
 
-Without the plugin the agent missed the OFFSET pagination, the most expensive statement in the export, in 2 of 3 runs, and the global `work_mem` in 1.
+Without the plugin the agent once wrote a plain `CREATE INDEX` that blocks writes on the live table, missed the dangerous global `work_mem` twice and the OFFSET pagination once. With it, one run missed the random UUID keys.
 
-The model already knows most textbook rules; the plugin makes it right every time and closes the gaps that cause production incidents. An earlier round, before the skill descriptions named the key rule and the user's words ("infinite scroll", "next page"), showed no difference and one skill that never loaded; that is why every description now starts with the task and its most important rule.
+The model already knows most textbook rules; the plugin makes it right every time and closes the gaps that cause production incidents. Two things made the difference. Every skill description starts with the user's words and the key rule. And a short session-start note (about 1,000 characters, [`hooks/session-context.md`](hooks/session-context.md)) lists the traps and tells the agent to load the matching skill even for a one-line query: before it, the skill loaded in 147 of 190 runs and the misses were exactly the failures; with it, 190 of 190.
 
 ---
 

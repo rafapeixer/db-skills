@@ -21,7 +21,7 @@ Funciona com Claude Code, Cursor, Codex e qualquer agente que leia arquivos `SKI
 /plugin install db-skills@db-skills
 ```
 
-As skills de decisão carregam sozinhas quando a tarefa corresponde. Os fluxos rodam quando você pede:
+As skills de decisão carregam sozinhas quando a tarefa corresponde; uma nota curta no início da sessão (cerca de 1.000 caracteres, [`hooks/session-context.md`](hooks/session-context.md)) lista as armadilhas e lembra o agente de carregá-las. Os fluxos rodam quando você pede:
 
 ```
 /db-skills:db-audit
@@ -97,31 +97,33 @@ Com 4 conexões, a página em um comando atende 3,2 vezes o que a página com N+
 
 ## Muda o que os agentes escrevem?
 
-Medido com `claude plugin eval` ([`evals/`](evals/)): cada tarefa roda com e sem o plugin, 3 vezes por lado, e graders por regex conferem o arquivo SQL que o agente escreve. Outubro de 2026.
+Medido com `claude plugin eval` ([`evals/`](evals/)): cada tarefa roda com e sem o plugin, **10 vezes por lado**, e graders por regex conferem o arquivo SQL que o agente escreve. Outubro de 2026.
 
 | | Sem plugin | Com plugin |
 |---|---|---|
-| 8 tarefas de base (índice online, FK, NOT NULL, paginação nos dois bancos, coluna INSTANT no MySQL, chave UUID, fila de jobs) | 24 / 24 | **24 / 24** |
-| 9 tarefas com armadilhas conhecidas | 23 / 27 | **27 / 27** |
-| **Todas as 51 execuções** | **47 / 51 (92%)** | **51 / 51 (100%)** |
+| 9 tarefas de base (índice online, FK, NOT NULL, paginação nos dois bancos, coluna INSTANT no MySQL, chave UUID, filas de jobs nos dois bancos) | 88 / 90 | **90 / 90** |
+| 10 tarefas com armadilhas conhecidas | 87 / 100 | **100 / 100** |
+| **Todas as 190 execuções** | **175 / 190 (92%)** | **190 / 190 (100%)** |
 
 Onde o agente errou sem o plugin:
 
 | Tarefa | Sem | Com | A falha |
 |---|---|---|---|
-| Procedure de transferência no MySQL | 1 / 3 | **3 / 3** | Sem retry da transação inteira no deadlock 1213, então uma transferência concorrente perde dinheiro |
-| Job único atrás do PgBouncer | 1 / 3 | **3 / 3** | `pg_advisory_lock` de sessão atrás de pooling por transação, então o job "único" roda duas vezes |
+| Procedure de transferência no MySQL | 2 / 10 | **10 / 10** | Sem retry da transação inteira no deadlock 1213, então uma transferência concorrente perde dinheiro |
+| Job único atrás do PgBouncer | 6 / 10 | **10 / 10** | `pg_advisory_lock` de sessão atrás de pooling por transação, então o job "único" roda duas vezes |
+| Scroll infinito no MySQL | 8 / 10 | **10 / 10** | `OFFSET`, ou o construtor de linha `(created_at, id) < (?, ?)`, que o MySQL não usa como faixa no índice |
+| Contador de estoque em promoção relâmpago | 9 / 10 | **10 / 10** | Uma linha quente que enfileira todas as compras |
 
-**Auditando um banco real.** O [`benchmarks/audit-fixture/`](benchmarks/audit-fixture/) monta um PostgreSQL 17 com dez problemas plantados (foreign key sem índice, índices duplicado e sem uso, paginação com OFFSET, N+1, uma sessão idle in transaction, autovacuum desligado com linhas mortas, frota acima do orçamento de conexões, `work_mem` global perigoso, chaves UUID aleatórias), roda tráfego e exporta as views padrão de estatística. O agente lê a exportação e escreve um relatório e uma migration; um juiz por problema mais checagens de segurança no SQL (CONCURRENTLY, sem VACUUM FULL, sem apagar chave primária).
+**Auditando um banco real.** O [`benchmarks/audit-fixture/`](benchmarks/audit-fixture/) monta um PostgreSQL 17 com dez problemas plantados (foreign key sem índice, índices duplicado e sem uso, paginação com OFFSET, N+1, uma sessão idle in transaction, autovacuum desligado com linhas mortas, frota acima do orçamento de conexões, `work_mem` global perigoso, chaves UUID aleatórias), roda tráfego e exporta as views padrão de estatística. O agente lê a exportação e escreve um relatório e uma migration; um juiz por problema mais checagens de segurança no SQL (CONCURRENTLY, inclusive nos rollbacks; sem VACUUM FULL; sem apagar chave primária). 10 execuções por lado.
 
 | | Sem plugin | Com plugin |
 |---|---|---|
-| Execuções que acharam os dez problemas e escreveram uma migration segura | 1 / 3 | **3 / 3** |
-| Checagens cumpridas | 45 / 48 | **48 / 48** |
+| Execuções que acharam os dez problemas e escreveram uma migration segura | 6 / 10 | **9 / 10** |
+| Checagens cumpridas | 156 / 160 | **159 / 160** |
 
-Sem o plugin, o agente deixou passar a paginação com OFFSET, a query mais cara da exportação, em 2 de 3 execuções, e o `work_mem` global em 1.
+Sem o plugin, o agente uma vez escreveu um `CREATE INDEX` comum, que bloqueia escritas na tabela em produção, deixou passar o `work_mem` global perigoso duas vezes e a paginação com OFFSET uma vez. Com o plugin, uma execução deixou passar as chaves UUID aleatórias.
 
-O modelo já conhece a maioria das regras de livro; o plugin faz ele acertar sempre e fecha as brechas que causam incidente em produção. Uma rodada anterior, antes de as descrições das skills trazerem a regra principal e as palavras do usuário ("infinite scroll", "next page"), não mostrou diferença e teve uma skill que nunca carregou; por isso toda descrição agora começa pela tarefa e pela regra mais importante.
+O modelo já conhece a maioria das regras de livro; o plugin faz ele acertar sempre e fecha as brechas que causam incidente em produção. Duas coisas fizeram a diferença. Toda descrição de skill começa pelas palavras do usuário e pela regra principal. E uma nota curta no início da sessão (cerca de 1.000 caracteres, [`hooks/session-context.md`](hooks/session-context.md)) lista as armadilhas e manda o agente carregar a skill certa mesmo para uma query de uma linha: antes dela, a skill carregou em 147 de 190 execuções e as falhas foram exatamente as que não carregaram; com ela, 190 de 190.
 
 ---
 

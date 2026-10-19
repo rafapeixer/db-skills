@@ -32,6 +32,23 @@ LANGUAGE sql AS $$
   SELECT jsonb_path_exists(plan_json(query), '$.** ? (@."Node Type" == $t)', jsonb_build_object('t', node_type));
 $$;
 
+-- held_locks lists the relation-level locks this session holds right now
+-- on a table or index, so an example can show the lock mode a statement
+-- keeps until commit ('AccessExclusiveLock', 'ShareLock', ...).
+CREATE FUNCTION held_locks(rel regclass) RETURNS text
+LANGUAGE sql AS $$
+  SELECT string_agg(mode, ',' ORDER BY mode) FROM pg_locks
+  WHERE locktype = 'relation' AND relation = rel AND pid = pg_backend_pid() AND granted;
+$$;
+
+-- xact_seq_scans counts sequential scans of a table in the current
+-- transaction (counters are not flushed while a transaction is open, so a
+-- delta inside one is exact). A statement that scans the table shows here.
+CREATE FUNCTION xact_seq_scans(rel regclass) RETURNS bigint
+LANGUAGE sql AS $$
+  SELECT coalesce((SELECT seq_scan FROM pg_stat_xact_user_tables WHERE relid = rel), 0);
+$$;
+
 -- assert_error runs a statement that must fail with the given SQLSTATE
 -- (for example '23505' unique_violation, '55P03' lock_not_available).
 CREATE FUNCTION assert_error(stmt text, expected_sqlstate text, msg text) RETURNS void

@@ -16,16 +16,7 @@ INSERT INTO orders SELECT g, g % 1000 + 1, g % 500 FROM generate_series(1, 10000
 ANALYZE accounts;
 ANALYZE orders;
 
-CREATE FUNCTION held_locks(rel regclass) RETURNS text
-LANGUAGE sql AS $$
-  SELECT string_agg(mode, ',' ORDER BY mode) FROM pg_locks
-  WHERE locktype = 'relation' AND relation = rel AND pid = pg_backend_pid() AND granted;
-$$;
-CREATE FUNCTION xact_seq_scans(rel regclass) RETURNS bigint
-LANGUAGE sql AS $$
-  SELECT coalesce((SELECT seq_scan FROM pg_stat_xact_user_tables WHERE relid = rel), 0);
-$$;
-
+-- held_locks and xact_seq_scans come from scripts/lib/pg-helpers.sql.
 CREATE EXTENSION dblink;
 SELECT dblink_connect('report', 'dbname=' || current_database());
 SELECT dblink_connect('migration', 'dbname=' || current_database());
@@ -122,3 +113,41 @@ UPDATE accounts SET email = 'user2@example.com' WHERE id = 2;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS accounts_email_idx ON accounts (email);
 SELECT assert_true(NOT indisvalid, 'the index is still INVALID: writes maintain it, queries ignore it')
 FROM pg_index WHERE indexrelid = 'accounts_email_idx'::regclass;
+
+-- 8. ADD COLUMN ... NOT NULL with no default cannot fill the existing rows.
+-- MISTAKE: nothing gives the 100,000 existing rows a value, so the
+-- statement checks them under ACCESS EXCLUSIVE, finds NULLs and aborts the
+-- migration with 23502. (A constant default keeps the filenode and works;
+-- see the good example.)
+SELECT assert_error('ALTER TABLE orders ADD COLUMN sku text NOT NULL',
+  '23502', 'ADD COLUMN NOT NULL without a default fails on a table with rows');
+
+-- 9. UNIQUE added without a prebuilt index builds the index under
+-- ACCESS EXCLUSIVE.
+BEGIN;
+SELECT xact_seq_scans('accounts') AS scans_before \gset
+-- MISTAKE: no CREATE UNIQUE INDEX CONCURRENTLY first, so ADD CONSTRAINT
+-- scans the table and builds the index itself while reads and writes wait.
+ALTER TABLE accounts ADD CONSTRAINT accounts_email_key UNIQUE (email);
+SELECT assert_true(xact_seq_scans('accounts') > :scans_before,
+  'ADD UNIQUE scanned accounts to build the index');
+SELECT assert_true(held_locks('accounts') = 'AccessExclusiveLock,ShareLock',
+  'and holds ACCESS EXCLUSIVE (plus the build''s SHARE) until commit: reads and writes wait');
+SELECT assert_error(format('SELECT dblink_exec(%L, %L)',
+  'dbname=' || current_database() || ' options=''-c lock_timeout=200''',
+  'INSERT INTO accounts VALUES (5001, ''late@example.com'')'),
+  '55P03', 'a signup waits for the whole index build');
+COMMIT;
+
+-- 10. A plain DROP INDEX takes ACCESS EXCLUSIVE on the table.
+BEGIN;
+-- MISTAKE: no CONCURRENTLY, so the drop waits for every running query on
+-- orders and, from then until commit, every new query on orders waits.
+DROP INDEX orders_created_at_idx;
+SELECT assert_true(held_locks('orders') = 'AccessExclusiveLock',
+  'DROP INDEX holds ACCESS EXCLUSIVE on the table, not only on the index');
+SELECT assert_error(format('SELECT * FROM dblink(%L, %L) AS r(n bigint)',
+  'dbname=' || current_database() || ' options=''-c lock_timeout=200''',
+  'SELECT count(*) FROM orders'),
+  '55P03', 'a plain SELECT on orders waits for the drop to commit');
+COMMIT;

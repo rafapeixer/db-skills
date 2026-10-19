@@ -2,7 +2,7 @@
 name: pg-vacuum-and-bloat
 description: Use when a PostgreSQL table or index keeps growing, designing update- or delete-heavy tables, writing mass DELETE or UPDATE jobs, or someone proposes VACUUM FULL. Key rules: never disable autovacuum, tune it per hot table; an open or idle-in-transaction session stops vacuum from removing any dead row, so set idle_in_transaction_session_timeout; fillfactor below 100 and no index on hot-updated columns for HOT updates; delete in batches; never VACUUM FULL a live table.
 metadata:
-  verified: 2026-10-18
+  verified: 2026-10-19
 ---
 
 # Vacuum and bloat
@@ -18,7 +18,7 @@ Every `UPDATE` and `DELETE` in PostgreSQL leaves the old row version behind as a
 3. Keep transactions short and set `idle_in_transaction_session_timeout` (and `transaction_timeout`, PG 17+), because any open transaction holds back the xmin horizon and VACUUM cannot remove tuples that died after it started.
 4. Design update-heavy tables for HOT updates: `fillfactor` below 100 and no index on the columns you update on every request, then check `n_tup_hot_upd` against `n_tup_upd`.
 5. Run large `DELETE` and `UPDATE` jobs in bounded batches with a commit per batch, and purge time-based data by dropping or detaching partitions instead of a mass `DELETE`.
-6. Never run `VACUUM FULL` on a live table; it takes `ACCESS EXCLUSIVE` for the whole rewrite and needs disk for a full second copy.
+6. Never run `VACUUM FULL`, `CLUSTER` or a plain `REINDEX` on a live table; the first two take `ACCESS EXCLUSIVE` for the whole rewrite and need disk for a full second copy, `REINDEX` blocks writes until the rebuild ends, and `REINDEX CONCURRENTLY` is the online form.
 7. Measure bloat with `pgstattuple` (exact) or `pgstattuple_approx` (cheaper), not with estimation formulas.
 8. Monitor `age(datfrozenxid)` and `age(relfrozenxid)` against `autovacuum_freeze_max_age` (default 200 million) and alert long before the server's own wraparound warnings.
 
@@ -34,7 +34,7 @@ Every `UPDATE` and `DELETE` in PostgreSQL leaves the old row version behind as a
 
 **One giant transaction is one giant pile of dead tuples.** A single `DELETE` of millions of rows creates all of its dead tuples at once, and none can be removed until it commits; meanwhile it is itself the oldest transaction holding the horizon for every other table in the database. Batches with a commit each let autovacuum reclaim space as you go and keep each transaction short. For time-based retention, "dropping an individual partition using `DROP TABLE`, or doing `ALTER TABLE DETACH PARTITION`, is far faster than a bulk operation" and "entirely avoid[s] the `VACUUM` overhead caused by a bulk `DELETE`" ([partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html)).
 
-**Plain VACUUM is online; VACUUM FULL is not.** Plain `VACUUM` "can operate in parallel with normal reading and writing of the table, as an exclusive lock is not obtained"; the space is kept for reuse in the same table, not returned to the OS (except empty pages at the end). `VACUUM FULL` "rewrites the entire contents of the table into a new disk file", "requires an `ACCESS EXCLUSIVE` lock", needs extra disk for the new copy, and is "not recommended for routine use" ([VACUUM](https://www.postgresql.org/docs/18/sql-vacuum.html)). `ACCESS EXCLUSIVE` blocks even `SELECT`. For bloated indexes use `REINDEX CONCURRENTLY` ([REINDEX](https://www.postgresql.org/docs/18/sql-reindex.html)).
+**Plain VACUUM is online; VACUUM FULL is not.** Plain `VACUUM` "can operate in parallel with normal reading and writing of the table, as an exclusive lock is not obtained"; the space is kept for reuse in the same table, not returned to the OS (except empty pages at the end). `VACUUM FULL` "rewrites the entire contents of the table into a new disk file", "requires an `ACCESS EXCLUSIVE` lock", needs extra disk for the new copy, and is "not recommended for routine use" ([VACUUM](https://www.postgresql.org/docs/18/sql-vacuum.html)). `ACCESS EXCLUSIVE` blocks even `SELECT`. The bad example measures it on PG 15 and 18: with a report holding `ACCESS SHARE` on `page_counters`, a `VACUUM FULL` from another session queues for `ACCESS EXCLUSIVE`, a plain `SELECT ... WHERE id = 1` that arrives after it fails with `55P03`, and the table has a new filenode when it finishes. `CLUSTER` does the same rewrite under the same lock (`pg_locks` shows `ACCESS EXCLUSIVE` plus the index rebuild's `SHARE` until commit). A plain `REINDEX` holds `SHARE` on the table, so writes wait for the whole rebuild, and `ACCESS EXCLUSIVE` on the index, so reads that use it wait too. For bloated indexes use `REINDEX CONCURRENTLY` ([REINDEX](https://www.postgresql.org/docs/18/sql-reindex.html)).
 
 **Measure, do not estimate.** `pgstattuple` "always performs a full-table scan and returns an exact count of live and dead tuples (and their sizes) and free space", under only a read lock. `pgstattuple_approx` skips all-visible pages using the visibility map and gives exact dead-tuple counts with estimated live tuples and free space. Both need superuser or the `pg_stat_scan_tables` role ([pgstattuple](https://www.postgresql.org/docs/18/pgstattuple.html)). It is a contrib extension shipped in the official Docker image.
 
@@ -91,7 +91,19 @@ UPDATE page_counters SET hits = hits + 1 WHERE id % 10 = 0;
 VACUUM page_counters;
 ```
 
-The test asserts that the second session is `idle in transaction` with an XID, that 0 of the 2,000 updates are HOT, and that after `VACUUM` `pgstattuple` still counts at least 2,000 dead tuples. It then rolls the second session back and shows the same `VACUUM` removing them all, so it fails if the open transaction stops holding the horizon.
+```sql
+SELECT dblink_send_query('maintenance', 'VACUUM FULL page_counters');
+```
+
+```sql
+-- MISTAKE: CLUSTER as a "faster VACUUM FULL": the same rewrite under the
+-- same lock, held until the transaction commits.
+BEGIN;
+SELECT pg_relation_filenode('page_counters') AS node_before \gset
+CLUSTER page_counters USING page_counters_pkey;
+```
+
+The test asserts that the second session is `idle in transaction` with an XID, that 0 of the 2,000 updates are HOT, and that after `VACUUM` `pgstattuple` still counts at least 2,000 dead tuples. It then rolls the second session back and shows the same `VACUUM` removing them all, so it fails if the open transaction stops holding the horizon. It then shows the lock-based "fixes": a `VACUUM FULL` queued behind a report blocks a plain `SELECT` (`55P03`) and leaves the table with a new filenode; `CLUSTER` holds `ACCESS EXCLUSIVE` (plus `SHARE`) and rewrites the table; a plain `REINDEX` holds `SHARE` on the table and `ACCESS EXCLUSIVE` on the index.
 
 ## Checklist
 
@@ -102,7 +114,7 @@ When reviewing schema or SQL under this skill, confirm:
 - [ ] `idle_in_transaction_session_timeout` is set for application roles, and nothing (job, migration, report, open psql) keeps a transaction open for minutes; `pg_stat_activity` shows no old `backend_xmin`.
 - [ ] Update-heavy tables have `fillfactor` below 100 and no index on a column changed by every update, and `n_tup_hot_upd / n_tup_upd` is checked.
 - [ ] Mass `DELETE` / `UPDATE` jobs run in batches with a commit per batch, or retention uses `DROP` / `DETACH PARTITION`.
-- [ ] No `VACUUM FULL` on a table that serves traffic; bloated indexes use `REINDEX CONCURRENTLY`.
+- [ ] No `VACUUM FULL`, `CLUSTER` or plain `REINDEX` on a table that serves traffic; bloated indexes use `REINDEX CONCURRENTLY`.
 - [ ] Bloat claims come from `pgstattuple` or `pgstattuple_approx`, not an estimate query.
 - [ ] Alerts exist on `age(datfrozenxid)` against `autovacuum_freeze_max_age`, and on replication slots and prepared transactions that hold back the horizon.
 

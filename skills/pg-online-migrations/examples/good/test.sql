@@ -20,19 +20,9 @@ INSERT INTO orders SELECT g, g % 1000 + 1, g % 500 FROM generate_series(1, 10000
 ANALYZE accounts;
 ANALYZE orders;
 
--- Relation-level locks this session holds right now.
-CREATE FUNCTION held_locks(rel regclass) RETURNS text
-LANGUAGE sql AS $$
-  SELECT string_agg(mode, ',' ORDER BY mode) FROM pg_locks
-  WHERE locktype = 'relation' AND relation = rel AND pid = pg_backend_pid() AND granted;
-$$;
-
--- Sequential scans of a table in the current transaction (counters are
--- not flushed while a transaction is open, so a delta inside one is exact).
-CREATE FUNCTION xact_seq_scans(rel regclass) RETURNS bigint
-LANGUAGE sql AS $$
-  SELECT coalesce((SELECT seq_scan FROM pg_stat_xact_user_tables WHERE relid = rel), 0);
-$$;
+-- held_locks (relation locks this session holds) and xact_seq_scans
+-- (sequential scans inside the current transaction) come from
+-- scripts/lib/pg-helpers.sql.
 
 -- 1. lock_timeout: a migration that cannot get its lock fails fast (55P03)
 -- instead of waiting, and the runner retries it.

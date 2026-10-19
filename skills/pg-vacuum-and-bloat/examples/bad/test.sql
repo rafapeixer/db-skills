@@ -68,3 +68,57 @@ VACUUM page_counters;
 SELECT assert_true(
   (SELECT dead_tuple_count = 0 FROM pgstattuple('page_counters')),
   'once the transaction ends, VACUUM removes the dead tuples');
+
+-- MISTAKE: VACUUM FULL to "get the space back". It rewrites the whole table
+-- into a new file under ACCESS EXCLUSIVE, so it waits behind every running
+-- query, every query that arrives after it waits behind it, and the copy
+-- needs the table's size again in free disk.
+SELECT pg_relation_filenode('page_counters') AS node_before \gset
+SELECT dblink_connect('report', 'dbname=' || current_database());
+SELECT dblink_exec('report', 'BEGIN');
+SELECT * FROM dblink('report', 'SELECT count(*) FROM page_counters') AS t(n bigint);
+SELECT dblink_connect('maintenance', 'dbname=' || current_database());
+SELECT dblink_send_query('maintenance', 'VACUUM FULL page_counters');
+DO $$
+BEGIN
+  FOR i IN 1..100 LOOP
+    EXIT WHEN EXISTS (SELECT 1 FROM pg_locks
+      WHERE relation = 'page_counters'::regclass AND mode = 'AccessExclusiveLock' AND NOT granted);
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END
+$$;
+-- A plain read from the application now waits too (bounded here at 500ms
+-- only so the test can observe it).
+SET lock_timeout = '500ms';
+SELECT assert_error('SELECT count(*) FROM page_counters WHERE id = 1',
+  '55P03', 'a plain SELECT is blocked behind the waiting VACUUM FULL');
+RESET lock_timeout;
+SELECT dblink_exec('report', 'COMMIT');
+SELECT * FROM dblink_get_result('maintenance') AS r(status text);
+SELECT dblink_disconnect('report');
+SELECT dblink_disconnect('maintenance');
+SELECT assert_true(pg_relation_filenode('page_counters') <> :node_before,
+  'VACUUM FULL wrote a new copy of the table');
+
+-- MISTAKE: CLUSTER as a "faster VACUUM FULL": the same rewrite under the
+-- same lock, held until the transaction commits.
+BEGIN;
+SELECT pg_relation_filenode('page_counters') AS node_before \gset
+CLUSTER page_counters USING page_counters_pkey;
+SELECT assert_true(held_locks('page_counters') = 'AccessExclusiveLock,ShareLock',
+  'CLUSTER holds ACCESS EXCLUSIVE on the table (plus SHARE for the index rebuild): reads and writes wait');
+SELECT assert_true(pg_relation_filenode('page_counters') <> :node_before,
+  'CLUSTER rewrote the table');
+COMMIT;
+
+-- MISTAKE: REINDEX without CONCURRENTLY to shrink a bloated index: SHARE on
+-- the table blocks every write for the whole rebuild, and ACCESS EXCLUSIVE
+-- on the index blocks the reads that use it.
+BEGIN;
+REINDEX INDEX page_counters_hits_idx;
+SELECT assert_true(held_locks('page_counters') = 'ShareLock',
+  'REINDEX holds SHARE on the table: writes wait');
+SELECT assert_true(held_locks('page_counters_hits_idx') = 'AccessExclusiveLock',
+  'and ACCESS EXCLUSIVE on the index');
+COMMIT;
